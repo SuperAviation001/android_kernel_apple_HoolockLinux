@@ -460,6 +460,13 @@ config REGULATOR_HI6421
 	  21 general purpose LDOs, 3 dedicated LDOs, and 5 BUCKs. All
 	  of them come with support to either ECO (idle) or sleep mode.
 
+config REGULATOR_HX_PMU_I2C
+	bool "Hx I2C PMU regulators"
+	depends on HX_PMU_I2C
+	help
+	  Supports various LDOs and power switches in PMUs on Hx SoC-based
+	  mobile devices.
+
 config REGULATOR_HI6421V530
 	tristate "HiSilicon Hi6421v530 PMIC voltage regulator support"
 	depends on MFD_HI6421_PMIC && OF

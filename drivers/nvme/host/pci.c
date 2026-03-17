@@ -276,8 +276,7 @@ static bool noacpi;
 module_param(noacpi, bool, 0444);
 MODULE_PARM_DESC(noacpi, "disable acpi bios quirks");
 
-struct nvme_dev;
-struct nvme_queue;
+#include "nvme-pci.h"
 
 static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown);
 static void nvme_delete_io_queues(struct nvme_dev *dev);
@@ -286,55 +285,6 @@ static void nvme_update_attrs(struct nvme_dev *dev);
 struct nvme_descriptor_pools {
 	struct dma_pool *large;
 	struct dma_pool *small;
-};
-
-/*
- * Represents an NVM Express device.  Each nvme_dev is a PCI function.
- */
-struct nvme_dev {
-	struct nvme_queue *queues;
-	struct blk_mq_tag_set tagset;
-	struct blk_mq_tag_set admin_tagset;
-	u32 __iomem *dbs;
-	struct device *dev;
-	unsigned online_queues;
-	unsigned max_qid;
-	unsigned io_queues[HCTX_MAX_TYPES];
-	unsigned int num_vecs;
-	u32 q_depth;
-	int io_sqes;
-	u32 db_stride;
-	void __iomem *bar;
-	unsigned long bar_mapped_size;
-	struct mutex shutdown_lock;
-	bool subsystem;
-	u64 cmb_size;
-	bool cmb_use_sqes;
-	u32 cmbsz;
-	u32 cmbloc;
-	struct nvme_ctrl ctrl;
-	u32 last_ps;
-	bool hmb;
-	struct sg_table *hmb_sgt;
-	mempool_t *dmavec_mempool;
-
-	/* shadow doorbell buffer support: */
-	__le32 *dbbuf_dbs;
-	dma_addr_t dbbuf_dbs_dma_addr;
-	__le32 *dbbuf_eis;
-	dma_addr_t dbbuf_eis_dma_addr;
-
-	/* host memory buffer support: */
-	u64 host_mem_size;
-	u32 nr_host_mem_descs;
-	u32 host_mem_descs_size;
-	dma_addr_t host_mem_descs_dma;
-	struct nvme_host_mem_buf_desc *host_mem_descs;
-	void **host_mem_desc_bufs;
-	unsigned int nr_allocated_queues;
-	unsigned int nr_write_queues;
-	unsigned int nr_poll_queues;
-	struct nvme_descriptor_pools descriptor_pools[];
 };
 
 static int io_queue_depth_set(const char *val, const struct kernel_param *kp)
@@ -353,45 +303,6 @@ static inline unsigned int cq_idx(unsigned int qid, u32 stride)
 	return (qid * 2 + 1) * stride;
 }
 
-static inline struct nvme_dev *to_nvme_dev(struct nvme_ctrl *ctrl)
-{
-	return container_of(ctrl, struct nvme_dev, ctrl);
-}
-
-/*
- * An NVM Express queue.  Each device has at least two (one for admin
- * commands and one for I/O commands).
- */
-struct nvme_queue {
-	struct nvme_dev *dev;
-	struct nvme_descriptor_pools descriptor_pools;
-	spinlock_t sq_lock;
-	void *sq_cmds;
-	 /* only used for poll queues: */
-	spinlock_t cq_poll_lock ____cacheline_aligned_in_smp;
-	struct nvme_completion *cqes;
-	dma_addr_t sq_dma_addr;
-	dma_addr_t cq_dma_addr;
-	u32 __iomem *q_db;
-	u32 q_depth;
-	u16 cq_vector;
-	u16 sq_tail;
-	u16 last_sq_tail;
-	u16 cq_head;
-	u16 qid;
-	u8 cq_phase;
-	u8 sqes;
-	unsigned long flags;
-#define NVMEQ_ENABLED		0
-#define NVMEQ_SQ_CMB		1
-#define NVMEQ_DELETE_ERROR	2
-#define NVMEQ_POLLED		3
-	__le32 *dbbuf_sq_db;
-	__le32 *dbbuf_cq_db;
-	__le32 *dbbuf_sq_ei;
-	__le32 *dbbuf_cq_ei;
-	struct completion delete_done;
-};
 
 /* bits for iod->flags */
 enum nvme_iod_flags {
@@ -423,27 +334,6 @@ enum nvme_iod_flags {
 struct nvme_dma_vec {
 	dma_addr_t addr;
 	unsigned int len;
-};
-
-/*
- * The nvme_iod describes the data in an I/O.
- */
-struct nvme_iod {
-	struct nvme_request req;
-	struct nvme_command cmd;
-	u8 flags;
-	u8 nr_descriptors;
-
-	size_t total_len;
-	struct dma_iova_state dma_state;
-	void *descriptors[NVME_MAX_NR_DESCRIPTORS];
-	struct nvme_dma_vec *dma_vecs;
-	unsigned int nr_dma_vecs;
-
-	dma_addr_t meta_dma;
-	size_t meta_total_len;
-	struct dma_iova_state meta_dma_state;
-	struct nvme_sgl_desc *meta_descriptor;
 };
 
 static inline unsigned int nvme_dbbuf_size(struct nvme_dev *dev)
@@ -931,6 +821,13 @@ static void nvme_unmap_data(struct request *req)
 	struct nvme_queue *nvmeq = req->mq_hctx->driver_data;
 	struct device *dma_dev = nvmeq->dev->dev;
 	unsigned int attrs = 0;
+	int ret;
+
+	if(dev->ctrl.quirks & NVME_QUIRK_HX_NVME) {
+		ret = nvme_hx_unmap_data(&dev->ctrl, req);
+		if(ret == BLK_STS_OK)
+			return;
+	}
 
 	if (iod->flags & IOD_SINGLE_SEGMENT) {
 		static_assert(offsetof(union nvme_data_ptr, prp1) ==
@@ -1221,6 +1118,12 @@ static blk_status_t nvme_map_data(struct request *req)
 	enum nvme_use_sgl use_sgl = nvme_pci_use_sgls(dev, req);
 	struct blk_dma_iter iter;
 	blk_status_t ret;
+
+	if(dev->ctrl.quirks & NVME_QUIRK_HX_NVME) {
+		ret = nvme_hx_map_data(&dev->ctrl, req, cmnd);
+		if(ret != BLK_STS_NOTSUPP)
+			return ret;
+	}
 
 	/*
 	 * Try to skip the DMA iterator for single segment requests, as that
@@ -3220,6 +3123,12 @@ static int nvme_pci_enable(struct nvme_dev *dev)
 	}
 	dev->ctrl.sqsize = dev->q_depth - 1; /* 0's based queue depth */
 
+	if (dev->ctrl.quirks & NVME_QUIRK_HX_NVME) {
+		result = nvme_hx_preinit(&dev->ctrl, dev->dev);
+		if (result)
+			goto disable;
+	}
+
 	nvme_map_cmb(dev);
 
 	pci_save_state(pdev);
@@ -3273,7 +3182,7 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown)
 		 * if doing a safe shutdown.
 		 */
 		if (!dead && shutdown)
-			nvme_wait_freeze_timeout(&dev->ctrl, NVME_IO_TIMEOUT);
+			    nvme_wait_freeze_timeout(&dev->ctrl, NVME_IO_TIMEOUT);
 	}
 
 	nvme_quiesce_io_queues(&dev->ctrl);
@@ -4236,6 +4145,15 @@ static const struct pci_device_id nvme_id_table[] = {
 		 */
 		.driver_data = NVME_QUIRK_SINGLE_VECTOR |
 				NVME_QUIRK_QDEPTH_ONE },
+	{ PCI_DEVICE(PCI_VENDOR_ID_APPLE, 0x2002),
+                /*
+                 * Fix for Hx Apple NVMe controller to avoid controller resets.
+                 * This controllor requires tags to be unique across admin and
+                 * the (only) I/O queue, so reserve the first 32 tags of the I/O queue.
+                 */
+		.driver_data = NVME_QUIRK_HX_NVME |
+				NVME_QUIRK_SINGLE_VECTOR |
+				NVME_QUIRK_SHARED_TAGS },
 	{ PCI_DEVICE(PCI_VENDOR_ID_APPLE, 0x2003) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_APPLE, 0x2005),
 		.driver_data = NVME_QUIRK_SINGLE_VECTOR |

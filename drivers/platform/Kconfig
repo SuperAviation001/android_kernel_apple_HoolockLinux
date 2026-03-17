@@ -3,6 +3,8 @@ source "drivers/platform/mips/Kconfig"
 
 source "drivers/platform/loongarch/Kconfig"
 
+source "drivers/platform/hx/Kconfig"
+
 source "drivers/platform/goldfish/Kconfig"
 
 source "drivers/platform/chrome/Kconfig"

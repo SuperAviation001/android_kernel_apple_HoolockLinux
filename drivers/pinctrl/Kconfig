@@ -286,6 +286,16 @@ config PINCTRL_INGENIC
 	select GPIOLIB_IRQCHIP
 	select REGMAP_MMIO
 
+config PINCTRL_HX_GPIO
+	def_bool y if ARCH_HX
+	depends on GPIOLIB
+	select PINMUX
+	select GPIOLIB_IRQCHIP
+	select GENERIC_PINCONF
+	select GENERIC_PINCTRL_GROUPS
+	select GENERIC_PINMUX_FUNCTIONS
+	select OF_GPIO
+
 config PINCTRL_K210
 	bool "Pinctrl driver for the Canaan Kendryte K210 SoC"
 	depends on RISCV && SOC_CANAAN_K210 || COMPILE_TEST

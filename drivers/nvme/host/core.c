@@ -48,12 +48,12 @@ struct nvme_ns_info {
 	bool no_vwc;
 };
 
-unsigned int admin_timeout = 60;
+unsigned int admin_timeout = 10;
 module_param(admin_timeout, uint, 0644);
 MODULE_PARM_DESC(admin_timeout, "timeout in seconds for admin commands");
 EXPORT_SYMBOL_GPL(admin_timeout);
 
-unsigned int nvme_io_timeout = 30;
+unsigned int nvme_io_timeout = 5;
 module_param_named(io_timeout, nvme_io_timeout, uint, 0644);
 MODULE_PARM_DESC(io_timeout, "timeout in seconds for I/O");
 EXPORT_SYMBOL_GPL(nvme_io_timeout);
@@ -2694,6 +2694,12 @@ int nvme_enable_ctrl(struct nvme_ctrl *ctrl)
 	else
 		ctrl->ctrl_config = NVME_CC_CSS_NVM;
 
+	if(ctrl->quirks & NVME_QUIRK_HX_NVME) {
+		ret = nvme_hx_preenable(ctrl, ctrl->dev);
+		if (ret)
+			return ret;
+	}
+
 	/*
 	 * Setting CRIME results in CSTS.RDY before the media is ready. This
 	 * makes it possible for media related commands to return the error
@@ -3580,6 +3586,11 @@ static int nvme_init_identify(struct nvme_ctrl *ctrl)
 		max_hw_sectors = nvme_mps_to_sectors(ctrl, id->mdts);
 	else
 		max_hw_sectors = UINT_MAX;
+
+	if(ctrl->quirks & NVME_QUIRK_HX_NVME) {
+		max_hw_sectors = min_not_zero(max_hw_sectors, nvme_hx_max_req_size(ctrl));
+	}
+
 	ctrl->max_hw_sectors =
 		min_not_zero(ctrl->max_hw_sectors, max_hw_sectors);
 
