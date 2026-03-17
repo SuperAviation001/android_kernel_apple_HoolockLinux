@@ -351,6 +351,14 @@ config MTK_IOMMU_V1
 
 	  if unsure, say N here.
 
+config HX_DART_IOMMU
+	bool "Hx SoC DART IOMMU"
+	depends on ARCH_HX
+	select ARM_DMA_USE_IOMMU
+	select IOMMU_API
+	help
+	  Support for DART IOMMU on Hx SoCs.
+
 config HYPERV_IOMMU
 	bool "Hyper-V IRQ Handling"
 	depends on HYPERV && X86
