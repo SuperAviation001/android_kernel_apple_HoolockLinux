@@ -1112,6 +1112,10 @@ struct task_struct {
 #endif
 	u64				gtime;
 	struct prev_cputime		prev_cputime;
+#ifdef CONFIG_CPU_FREQ_TIMES
+	u64				*time_in_state;
+	unsigned int			max_state;
+#endif
 #ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
 	struct vtime			vtime;
 #endif
