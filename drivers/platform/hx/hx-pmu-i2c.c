@@ -13,6 +13,7 @@
 #include <linux/i2c.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/of_device.h>
 #include <linux/regmap.h>
 #include <linux/hx-pmu-i2c.h>
 
@@ -28,7 +29,7 @@ static const struct of_device_id hx_pmu_i2c_of_match[] = {
     { },
 };
 
-static int hx_pmu_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+static int hx_pmu_i2c_probe(struct i2c_client *i2c)
 {
     struct device_node *node = i2c->dev.of_node, *child;
     const struct of_device_id *of_id;
