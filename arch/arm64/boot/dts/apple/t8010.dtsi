@@ -339,6 +339,12 @@
 				pinmux = <APPLE_PINMUX(41, 1)>,
 					 <APPLE_PINMUX(42, 1)>;
 			};
+
+			pcie_pins: pcie-pins {
+				pinmux = <APPLE_PINMUX(12, 0)>,
+					 <APPLE_PINMUX(16, 0)>;
+			};
+
 		};
 
 		pinctrl_aop: pinctrl@2100f0000 {
@@ -397,6 +403,68 @@
 			compatible = "apple,t8010-sart";
 			reg = <0x2 0x06010040 0x0 0x40>;
 			power-domains = <&ps_ans2>;
+		};
+
+		apcie: pcie@206000000 {
+			compatible = "apple,t8010-pcie", "apple,pcie";
+			reg = <0x2 0x06000000 0x0 0x1000>,
+			      <0x2 0x06100000 0x0 0x28000>,
+			      <0x2 0x06128000 0x0 0x28000>,
+			      <0x2 0x06150000 0x0 0x28000>,
+			      <0x2 0x06178000 0x0 0x28000>;
+			reg-names = "rc", "port0", "port1", "port2", "port3";
+			interrupt-parent = <&aic>;
+			interrupts = <AIC_IRQ 270 IRQ_TYPE_LEVEL_HIGH>,
+				     <AIC_IRQ 273 IRQ_TYPE_LEVEL_HIGH>,
+				     <AIC_IRQ 276 IRQ_TYPE_LEVEL_HIGH>,
+				     <AIC_IRQ 279 IRQ_TYPE_LEVEL_HIGH>;
+			msi-controller;
+			msi-parent = <&aic>;
+			apple,msi-address = <0xC0100400>;
+			apple,msi-vector-offset = <288>;
+			apple,num-msi-vectors = <32>;
+			power-domains = <&ps_pcie>;
+			pinctrl-0 = <&pcie_pins>;
+			pinctrl-names = "default";
+			iommu-map = <0x000 &dart_apcie0 1 1>,
+				    <0x300 &dart_apcie3 1 1>;
+			iommu-map-mask = <0x300>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+			ranges = <0x43000000 0x2 0x06200000
+				  0x2 0x06200000
+				  0x0 0x001a0000>,
+				 <0x02000000 0x0 0x080700c0
+				  0x0 0x080700c0
+				  0x0 0x00400000>;
+			bus-range = <0x0 0x8>;
+			#ports = <4>;
+			status = "disabled";
+
+			pcie0_port0: pcie@0,0 {
+				reg = <0x00000000 0 0 0 0>;
+				#address-cells = <3>;
+				#size-cells = <2>;
+				ranges;
+				apple,max-link-speed = <3>;
+				apple,t-refclk-to-perst-us = <100>;
+				apple,nvme-mmu-force-active;
+				status = "disabled";
+
+				nvme: nvme@0,0 {
+					compatible = "apple,t8010-nvme-ans2",
+						     "apple,s8000-nvme-ans2",
+						     "apple,t8103-nvme-ans2";
+					reg = <0x00000000 0 0 0 0>;
+					reg-names = "nvme";
+					interrupt-parent = <&aic>;
+					interrupts = <AIC_IRQ 272 IRQ_TYPE_LEVEL_HIGH>;
+					apple,sart = <&sart>;
+					power-domains = <&ps_ans2>, <&ps_pcie>;
+					power-domain-names = "ans", "apcie0";
+					resets = <&ps_ans2>;
+				};
+			};
 		};
 
 		pmgr_mini: power-management@210200000 {
