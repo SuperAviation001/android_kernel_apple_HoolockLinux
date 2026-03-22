@@ -399,8 +399,8 @@
 			status = "disabled";
 		};
 
-		sart: iommu@206010040 {
-			compatible = "apple,t8010-sart";
+		sart_nvme0: sart@206010040 {
+			compatible = "apple,t8010-sart", "apple,t8015-sart";
 			reg = <0x2 0x06010040 0x0 0x40>;
 			power-domains = <&ps_ans2>;
 		};
