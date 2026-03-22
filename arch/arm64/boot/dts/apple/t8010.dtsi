@@ -369,7 +369,7 @@
 				     <AIC_IRQ 134 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
-		dart_apcie0: iommu@206010000 {
+		dart1: iommu@206010000 {
 			compatible = "apple,t8010-dart", "apple,dart";
 			reg = <0x2 0x06010000 0x0 0x4000>;
 			interrupt-parent = <&aic>;
@@ -379,7 +379,7 @@
 			status = "disabled";
 		};
 
-		dart_apcie2: iommu@206030000 {
+		dart2a: iommu@206030000 {
 			compatible = "apple,t8010-dart", "apple,dart";
 			reg = <0x2 0x06030000 0x0 0x4000>;
 			interrupt-parent = <&aic>;
@@ -389,7 +389,7 @@
 			status = "disabled";
 		};
 
-		dart_apcie3: iommu@206040000 {
+		dart2b: iommu@206040000 {
 			compatible = "apple,t8010-dart", "apple,dart";
 			reg = <0x2 0x06040000 0x0 0x4000>;
 			interrupt-parent = <&aic>;
