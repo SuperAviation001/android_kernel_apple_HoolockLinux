@@ -75,7 +75,7 @@
 #define APPLE_NVME_AQ_MQ_TAG_DEPTH (APPLE_NVME_AQ_DEPTH - 1)
 
 #define APPLE_NVME_IOSQES	7
-
+#define APPLE_NVME_T8010_IOSQES 6
 /*
  * These can be higher, but we need to ensure that any command doesn't
  * require an sg allocation that needs more than a page of data.
@@ -310,6 +310,25 @@ static void apple_nvme_submit_cmd_t8015(struct apple_nvme_queue *q,
 	spin_unlock_irq(&anv->lock);
 }
 
+static void apple_nvme_submit_cmd_t8010(struct apple_nvme_queue *q,
+                                  struct nvme_command *cmd)
+{
+        struct apple_nvme *anv = queue_to_apple_nvme(q);
+
+        spin_lock_irq(&anv->lock);
+
+        if (q->is_adminq)
+                memcpy(&q->sqes[q->sq_tail], cmd, sizeof(*cmd));
+        else
+                memcpy((void *)q->sqes + (q->sq_tail << APPLE_NVME_IOSQES),
+                        cmd, sizeof(*cmd));
+
+        if (++q->sq_tail == anv->hw->max_queue_depth)
+                q->sq_tail = 0;
+
+        writel(q->sq_tail, q->sq_db);
+        spin_unlock_irq(&anv->lock);
+}
 
 static void apple_nvme_submit_cmd_t8103(struct apple_nvme_queue *q,
 				  struct nvme_command *cmd)
@@ -800,6 +819,8 @@ static blk_status_t apple_nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	if (anv->hw->has_lsq_nvmmu)
 		apple_nvme_submit_cmd_t8103(q, cmnd);
+	else if (anv->hw->max_queue_depth == 36)
+        	apple_nvme_submit_cmd_t8010(q, cmnd);
 	else
 		apple_nvme_submit_cmd_t8015(q, cmnd);
 
@@ -1365,7 +1386,7 @@ static int apple_nvme_queue_alloc(struct apple_nvme *anv,
 	if (anv->hw->has_lsq_nvmmu)
 		iosq_size = depth * sizeof(struct nvme_command);
 	else
-		iosq_size = depth << APPLE_NVME_IOSQES;
+		iosq_size = depth << 	APPLE_NVME_IOSQES;
 
 	q->sqes = dmam_alloc_coherent(anv->dev, iosq_size,
 				      &q->sq_dma_addr, GFP_KERNEL);
@@ -1692,6 +1713,11 @@ static int apple_nvme_suspend(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(apple_nvme_pm_ops, apple_nvme_suspend,
 				apple_nvme_resume);
 
+static const struct apple_nvme_hw apple_nvme_t8010_hw = {
+	.has_lsq_nvmmu = false,
+	.max_queue_depth = 36,
+};
+
 static const struct apple_nvme_hw apple_nvme_t8015_hw = {
 	.has_lsq_nvmmu = false,
 	.max_queue_depth = 16,
@@ -1703,6 +1729,7 @@ static const struct apple_nvme_hw apple_nvme_t8103_hw = {
 };
 
 static const struct of_device_id apple_nvme_of_match[] = {
+	{ .compatible = "apple,t8010-nvme-ans2", .data = &apple_nvme_t8010_hw },
 	{ .compatible = "apple,t8015-nvme-ans2", .data = &apple_nvme_t8015_hw },
 	{ .compatible = "apple,t8103-nvme-ans2", .data = &apple_nvme_t8103_hw },
 	{ .compatible = "apple,nvme-ans2", .data = &apple_nvme_t8103_hw },
