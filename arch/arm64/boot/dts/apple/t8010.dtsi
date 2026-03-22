@@ -312,8 +312,9 @@
                         power-domains = <&ps_ans2>;
                 };
 
-                apcie: pcie@206000000 {
+                pcie0: pcie@206000000 {
                         compatible = "apple,t8010-pcie", "apple,pcie";
+			device_type = "pci";
                         reg = <0x2 0x06000000 0x0 0x1000>,
                               <0x2 0x06100000 0x0 0x28000>,
                               <0x2 0x06128000 0x0 0x28000>,
@@ -346,7 +347,6 @@
                                   0x0 0x00400000>;
                         bus-range = <0x0 0x8>;
                         #ports = <4>;
-                        status = "disabled";
 
                         pcie0_port0: pcie@0,0 {
                                 reg = <0x00000000 0 0 0 0>;
@@ -356,7 +356,6 @@
                                 apple,max-link-speed = <3>;
                                 apple,t-refclk-to-perst-us = <100>;
                                 apple,nvme-mmu-force-active;
-                                status = "disabled";
 
                                 nvme: nvme@0,0 {
                                         compatible = "apple,t8010-nvme-ans2",
