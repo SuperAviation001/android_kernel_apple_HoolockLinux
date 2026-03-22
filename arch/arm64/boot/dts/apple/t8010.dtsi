@@ -363,6 +363,36 @@
 				     <AIC_IRQ 134 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
+		dart_apcie0: iommu@206010000 {
+			compatible = "apple,t8010-dart", "apple,dart";
+			reg = <0x2 0x06010000 0x0 0x4000>;
+			interrupt-parent = <&aic>;
+			interrupts = <AIC_IRQ 271 IRQ_TYPE_LEVEL_HIGH>;
+			power-domains = <&ps_apcie_st>;
+			#iommu-cells = <1>;
+			status = "disabled";
+		};
+
+		dart_apcie2: iommu@206030000 {
+			compatible = "apple,t8010-dart", "apple,dart";
+			reg = <0x2 0x06030000 0x0 0x4000>;
+			interrupt-parent = <&aic>;
+			interrupts = <AIC_IRQ 277 IRQ_TYPE_LEVEL_HIGH>;
+			power-domains = <&ps_apcie_st>;
+			#iommu-cells = <1>;
+			status = "disabled";
+		};
+
+		dart_apcie3: iommu@206040000 {
+			compatible = "apple,t8010-dart", "apple,dart";
+			reg = <0x2 0x06040000 0x0 0x4000>;
+			interrupt-parent = <&aic>;
+			interrupts = <AIC_IRQ 280 IRQ_TYPE_LEVEL_HIGH>;
+			power-domains = <&ps_apcie_st>;
+			#iommu-cells = <1>;
+			status = "disabled";
+		};
+
 		pmgr_mini: power-management@210200000 {
 			compatible = "apple,t8010-pmgr", "apple,pmgr", "syscon", "simple-mfd";
 			#address-cells = <1>;
