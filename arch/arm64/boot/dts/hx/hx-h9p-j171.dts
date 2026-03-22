@@ -355,46 +355,6 @@
             supply-name = "lcd_ldo";
         };
 
-        i2c0: i2c0@20a110000 {
-            compatible = "hx,i2c";
-            reg = <0x2 0x0a110000 0x0 0x1000>;
-            interrupts = <0 232 4>;
-            clocks = <&i2c0clk>;
-            pinctrl-0 = <&i2c0_pins>;
-            pinctrl-names = "default";
-            #address-cells = <0x1>;
-            #size-cells = <0x0>;
-
-            disp_pmu: disp_pmu@27 {
-                compatible = "hx,pmu-chestnut";
-                reg = <0x27>;
-                #address-cells = <0x1>;
-                #size-cells = <0x0>;
-
-                touch_ldo: touch_ldo@5 {
-                    compatible = "hx,i2c-pmu-switch";
-                    reg = <0x5>;
-                    mask = <0x10>;
-                    enable = <0x10>;
-                    supply-name = "mipi_dsi";
-                };
-
-                lcd_ldo: lcd_ldo@5 {
-                    compatible = "hx,i2c-pmu-switch";
-                    reg = <0x5>;
-                    mask = <0x0F>;
-                    enable = <0x0F>;
-                };
-            };
-
-            backlight: lm3539@62 {
-                compatible = "dwi,lm3539";
-                reg = <0x62>;
-                dwi = <&dwi>;
-                lcd-supply = <&mipi_dsi>;
-            };
-        };
-
         i2c1: i2c1@20a111000 {
             compatible = "hx,i2c";
             reg = <0x2 0x0a111000 0x0 0x1000>;
@@ -452,28 +412,6 @@
                 reg = <0x75>;
                 charge-current = <1950>;
             };
-        };
-
-        i2c2: i2c2@20a112000 {
-            compatible = "hx,i2c";
-            reg = <0x2 0x0a112000 0x0 0x1000>;
-            interrupts = <0 234 4>;
-            clocks = <&i2c2clk>;
-            pinctrl-0 = <&i2c2_pins>;
-            pinctrl-names = "default";
-            #address-cells = <0x1>;
-            #size-cells = <0x0>;
-        };
-
-        i2c3: i2c3@20a113000 {
-            compatible = "hx,i2c";
-            reg = <0x2 0x0a113000 0x0 0x1000>;
-            interrupts = <0 235 4>;
-            clocks = <&i2c3clk>;
-            pinctrl-0 = <&i2c3_pins>;
-            pinctrl-names = "default";
-            #address-cells = <0x1>;
-            #size-cells = <0x0>;
         };
 
         spi0: spi@20a080000 {
@@ -602,51 +540,6 @@
             reg = <0x2 0x102b0000 0x0 0x4000>;
             nvmem = <&bbram>;
             nvmem-poweroff = <0x1 0xff 0x00   0x2 0xff 0x00   0x3 0xff 0x00   0xf 0xf0 0x90>;
-        };
-    };
-
-    usbcomplex {
-        compatible = "simple-bus";
-        #address-cells = <2>;
-        #size-cells = <2>;
-        dma-ranges = <0x0 0x00000000 0x8 0x00000000 0x1 0x00000000>;
-        ranges;
-
-        usbdev: usbdev@20c100000 {
-            compatible = "hx,usbdev";
-            reg = <0x2 0x0c100000 0x0 0x10000>;
-            interrupts = <0 241 4>;
-            clocks = <&usbdevclk>;
-            clock-names = "otg";
-            hx,dma-remap;
-        };
-    };
-
-    gpio-keys {
-        compatible = "gpio-keys";
-
-        volup {
-            label = "Volume Up";
-            gpios = <&gpio 23 1>;
-            linux,code = <115>;
-        };
-
-        voldown {
-            label = "Volume Down";
-            gpios = <&gpio 180 1>;
-            linux,code = <114>;
-        };
-
-        ringerab {
-            label = "Ringer AB";
-            gpios = <&gpio 86 1>;
-            linux,code = <113>;
-        };
-
-        hold {
-            label = "Hold";
-            gpios = <&gpio 179 1>;
-            linux,code = <116>;
         };
     };
 };
