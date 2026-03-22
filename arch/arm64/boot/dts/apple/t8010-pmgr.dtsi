@@ -525,6 +525,15 @@
 		apple,always-on; /* LPDDR4 interface */
 	};
 
+	ps_ans2: power-controller@8026c {
+		compatible = "apple,t8010-pmgr-pwrstate", "apple,pmgr-pwrstate";
+		reg = <0x8026c 4>;
+                #power-domain-cells = <0>;
+                #reset-cells = <0>;
+                label = "ans2";
+                apple,always-on;
+	};
+
 	ps_usb2host0_ohci: power-controller@80280 {
 		compatible = "apple,t8010-pmgr-pwrstate", "apple,pmgr-pwrstate";
 		reg = <0x80280 4>;

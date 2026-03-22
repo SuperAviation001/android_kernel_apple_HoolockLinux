@@ -368,7 +368,7 @@
 			reg = <0x2 0x06010000 0x0 0x4000>;
 			interrupt-parent = <&aic>;
 			interrupts = <AIC_IRQ 271 IRQ_TYPE_LEVEL_HIGH>;
-			power-domains = <&ps_apcie_st>;
+			power-domains = <&ps_pcie>;
 			#iommu-cells = <1>;
 			status = "disabled";
 		};
@@ -378,7 +378,7 @@
 			reg = <0x2 0x06030000 0x0 0x4000>;
 			interrupt-parent = <&aic>;
 			interrupts = <AIC_IRQ 277 IRQ_TYPE_LEVEL_HIGH>;
-			power-domains = <&ps_apcie_st>;
+			power-domains = <&ps_pcie>;
 			#iommu-cells = <1>;
 			status = "disabled";
 		};
@@ -388,7 +388,7 @@
 			reg = <0x2 0x06040000 0x0 0x4000>;
 			interrupt-parent = <&aic>;
 			interrupts = <AIC_IRQ 280 IRQ_TYPE_LEVEL_HIGH>;
-			power-domains = <&ps_apcie_st>;
+			power-domains = <&ps_pcie>;
 			#iommu-cells = <1>;
 			status = "disabled";
 		};
@@ -396,7 +396,7 @@
 		sart: iommu@206010040 {
 			compatible = "apple,t8010-sart";
 			reg = <0x2 0x06010040 0x0 0x40>;
-			power-domains = <&ps_pcie>;
+			power-domains = <&ps_ans2>;
 		};
 
 		pmgr_mini: power-management@210200000 {
