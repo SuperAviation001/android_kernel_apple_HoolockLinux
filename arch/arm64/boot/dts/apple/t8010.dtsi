@@ -393,6 +393,12 @@
 			status = "disabled";
 		};
 
+		sart: iommu@206010040 {
+			compatible = "apple,t8010-sart";
+			reg = <0x2 0x06010040 0x0 0x40>;
+			power-domains = <&ps_pcie>;
+		};
+
 		pmgr_mini: power-management@210200000 {
 			compatible = "apple,t8010-pmgr", "apple,pmgr", "syscon", "simple-mfd";
 			#address-cells = <1>;
