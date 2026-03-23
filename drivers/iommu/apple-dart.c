@@ -46,6 +46,47 @@
 #define DART_PARAMS2 0x04
 #define DART_PARAMS2_BYPASS_SUPPORT BIT(0)
 
+
+/* T8010 registers */
+
+#define DART_T8010_STREAM_COMMAND 0x20
+#define DART_T8010_STREAM_COMMAND_BUSY BIT(2)
+#define DART_T8010_STREAM_COMMAND_INVALIDATE BIT(20)
+
+#define DART_T8010_STREAM_SELECT 0x34
+
+#define DART_T8010_ERROR 0x40
+#define DART_T8010_ERROR_STREAM GENMASK(27, 24)
+#define DART_T8010_ERROR_CODE GENMASK(11, 0)
+#define DART_T8010_ERROR_FLAG BIT(31)
+
+#define DART_T8010_ERROR_READ_FAULT BIT(4)
+#define DART_T8010_ERROR_WRITE_FAULT BIT(3)
+#define DART_T8010_ERROR_NO_PTE BIT(2)
+#define DART_T8010_ERROR_NO_PMD BIT(1)
+#define DART_T8010_ERROR_NO_TTBR BIT(0)
+
+#define DART_T8010_CONFIG 0xC
+#define DART_T8010_CONFIG_LOCK BIT(15)
+
+#define DART_STREAM_COMMAND_BUSY_TIMEOUT 100
+
+#define DART_T8010_ERROR_ADDR_HI 0x54
+#define DART_T8010_ERROR_ADDR_LO 0x50
+
+#define DART_T8010_STREAMS_ENABLE 0xfc
+
+#define DART_T8010_TCR                  0x100
+#define DART_T8010_TCR_TRANSLATE_ENABLE BIT(7)
+#define DART_T8010_TCR_BYPASS_DART      BIT(8)
+#define DART_T8010_TCR_BYPASS_DAPF      BIT(12)
+
+#define DART_T8010_TTBR       0x200
+#define DART_T8010_USB4_TTBR  0x400
+#define DART_T8010_TTBR_VALID BIT(31)
+#define DART_T8010_TTBR_ADDR_FIELD_SHIFT 0
+#define DART_T8010_TTBR_SHIFT 12
+
 /* T8020/T6000 registers */
 
 #define DART_T8020_STREAM_COMMAND 0x20
@@ -154,6 +195,7 @@
 struct apple_dart_stream_map;
 
 enum dart_type {
+	DART_T8010,
 	DART_T8020,
 	DART_T6000,
 	DART_T8110,
@@ -379,6 +421,38 @@ apple_dart_hw_clear_all_ttbrs(struct apple_dart_stream_map *stream_map)
 }
 
 static int
+apple_dart_t8010_hw_stream_command(struct apple_dart_stream_map *stream_map,
+                             u32 command)
+{
+        unsigned long flags;
+        int ret, i;
+        u32 command_reg;
+
+        spin_lock_irqsave(&stream_map->dart->lock, flags);
+
+        for (i = 0; i < BITS_TO_U32(stream_map->dart->num_streams); i++)
+                writel(stream_map->sidmap[i],
+                       stream_map->dart->regs + DART_T8010_STREAM_SELECT + 4 * i);
+        writel(command, stream_map->dart->regs + DART_T8010_STREAM_COMMAND);
+
+        ret = readl_poll_timeout_atomic(
+                stream_map->dart->regs + DART_T8010_STREAM_COMMAND, command_reg,
+                !(command_reg & DART_T8010_STREAM_COMMAND_BUSY), 1,
+                DART_STREAM_COMMAND_BUSY_TIMEOUT);
+
+        spin_unlock_irqrestore(&stream_map->dart->lock, flags);
+
+        if (ret) {
+                dev_err(stream_map->dart->dev,
+                        "busy bit did not clear after command %x for streams %lx\n",
+                        command, stream_map->sidmap[0]);
+                return ret;
+        }
+
+        return 0;
+}
+
+static int
 apple_dart_t8020_hw_stream_command(struct apple_dart_stream_map *stream_map,
 			     u32 command)
 {
@@ -446,6 +520,13 @@ apple_dart_t8110_hw_tlb_command(struct apple_dart_stream_map *stream_map,
 	}
 
 	return 0;
+}
+
+static int
+apple_dart_t8010_hw_invalidate_tlb(struct apple_dart_stream_map *stream_map)
+{
+        return apple_dart_t8010_hw_stream_command(
+                stream_map, DART_T8010_STREAM_COMMAND_INVALIDATE);
 }
 
 static int
@@ -1023,6 +1104,43 @@ static const struct iommu_ops apple_dart_iommu_ops = {
 	}
 };
 
+static irqreturn_t apple_dart_t8010_irq(int irq, void *dev)
+{
+        struct apple_dart *dart = dev;
+        const char *fault_name = NULL;
+        u32 error = readl(dart->regs + DART_T8010_ERROR);
+        u32 error_code = FIELD_GET(DART_T8010_ERROR_CODE, error);
+        u32 addr_lo = readl(dart->regs + DART_T8010_ERROR_ADDR_LO);
+        u32 addr_hi = readl(dart->regs + DART_T8010_ERROR_ADDR_HI);
+        u64 addr = addr_lo | (((u64)addr_hi) << 32);
+        u8 stream_idx = FIELD_GET(DART_T8010_ERROR_STREAM, error);
+
+        if (!(error & DART_T8010_ERROR_FLAG))
+                return IRQ_NONE;
+
+        /* there should only be a single bit set but let's use == to be sure */
+        if (error_code == DART_T8010_ERROR_READ_FAULT)
+                fault_name = "READ FAULT";
+        else if (error_code == DART_T8010_ERROR_WRITE_FAULT)
+                fault_name = "WRITE FAULT";
+        else if (error_code == DART_T8010_ERROR_NO_PTE)
+                fault_name = "NO PTE FOR IOVA";
+        else if (error_code == DART_T8010_ERROR_NO_PMD)
+                fault_name = "NO PMD FOR IOVA";
+        else if (error_code == DART_T8010_ERROR_NO_TTBR)
+                fault_name = "NO TTBR FOR IOVA";
+        else
+                fault_name = "unknown";
+
+        dev_err_ratelimited(
+                dart->dev,
+                "translation fault: status:0x%x stream:%d code:0x%x (%s) at 0x%llx",
+                error, stream_idx, error_code, fault_name, addr);
+
+        writel(error, dart->regs + DART_T8010_ERROR);
+        return IRQ_HANDLED;
+}
+
 static irqreturn_t apple_dart_t8020_irq(int irq, void *dev)
 {
 	struct apple_dart *dart = dev;
@@ -1146,6 +1264,7 @@ static int apple_dart_probe(struct platform_device *pdev)
 	dart->supports_bypass = dart_params[1] & DART_PARAMS2_BYPASS_SUPPORT;
 
 	switch (dart->hw->type) {
+	case DART_T8010:
 	case DART_T8020:
 	case DART_T6000:
 		dart->ias = 32;
@@ -1218,6 +1337,32 @@ static void apple_dart_remove(struct platform_device *pdev)
 	iommu_device_sysfs_remove(&dart->iommu);
 
 	clk_bulk_disable_unprepare(dart->num_clks, dart->clks);
+}
+
+static const struct apple_dart_hw apple_dart_hw_t8010 = {
+        .type = DART_T8010,
+        .irq_handler = apple_dart_t8010_irq,
+        .invalidate_tlb = apple_dart_t8010_hw_invalidate_tlb,
+        .oas = 36,
+        .fmt = APPLE_DART,
+        .max_sid_count = 4,
+
+        .enable_streams = DART_T8010_STREAMS_ENABLE,
+        .lock = DART_T8010_CONFIG,
+        .lock_bit = DART_T8010_CONFIG_LOCK,
+
+        .error = DART_T8010_ERROR,
+
+        .tcr = DART_T8010_TCR,
+        .tcr_enabled = DART_T8010_TCR_TRANSLATE_ENABLE,
+        .tcr_disabled = 0,
+        .tcr_bypass = DART_T8010_TCR_BYPASS_DAPF | DART_T8010_TCR_BYPASS_DART,
+
+        .ttbr = DART_T8010_TTBR,
+        .ttbr_valid = DART_T8010_TTBR_VALID,
+        .ttbr_addr_field_shift = DART_T8010_TTBR_ADDR_FIELD_SHIFT,
+        .ttbr_shift = DART_T8010_TTBR_SHIFT,
+        .ttbr_count = 4,
 }
 
 static const struct apple_dart_hw apple_dart_hw_t8103 = {
@@ -1364,6 +1509,7 @@ static __maybe_unused int apple_dart_resume(struct device *dev)
 static DEFINE_SIMPLE_DEV_PM_OPS(apple_dart_pm_ops, apple_dart_suspend, apple_dart_resume);
 
 static const struct of_device_id apple_dart_of_match[] = {
+	{ .compatible = "apple,t8010-dart", .data = &apple_dart_hw_t8010 },
 	{ .compatible = "apple,t8103-dart", .data = &apple_dart_hw_t8103 },
 	{ .compatible = "apple,t8103-usb4-dart", .data = &apple_dart_hw_t8103_usb4 },
 	{ .compatible = "apple,t8110-dart", .data = &apple_dart_hw_t8110 },
