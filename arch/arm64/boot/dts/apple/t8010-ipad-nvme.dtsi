@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
+/*
+ * NVMe, SART, PCIe DARTs and PCIe host controller for Apple T8010 (A10 Fusion)
+ * Common include for j171ap (Apple iPad 7 Wi-Fi), j172ap (Apple iPad 7 Cellular), j72b (Apple iPad 6 Cellular) and j71b (Apple iPad 6 Wi-Fi)
+ *
+ * Copyright (C) Nobody, don't take credit for this work unless you are the actual author.
+ */
+
+#include <dt-bindings/interrupt-controller/apple-aic.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	sart: iommu@601004000 {
+		compatible = "apple,t8010-sart", "apple,t8015-sart";
+		reg = <0x6 0x01004000 0x0 0x4000>;
+		power-domains = <&ps_ans2>;
+	};
+
+	pcie0_dart_0: iommu@601008000 {
+		compatible = "apple,t8010-dart", "apple,t8103-dart";
+		reg = <0x6 0x01008000 0x0 0x4000>;
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 0 271 IRQ_TYPE_LEVEL_HIGH>;
+		#iommu-cells = <1>;
+		power-domains = <&ps_pcie>;
+	};
+
+	pcie0_dart_1: iommu@602008000 {
+		compatible = "apple,t8010-dart", "apple,t8103-dart";
+		reg = <0x6 0x02008000 0x0 0x4000>;
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 0 274 IRQ_TYPE_LEVEL_HIGH>;
+		#iommu-cells = <1>;
+		power-domains = <&ps_pcie>;
+		status = "disabled";
+	};
+
+	pcie0_dart_2: iommu@603008000 {
+		compatible = "apple,t8010-dart", "apple,t8103-dart";
+		reg = <0x6 0x03008000 0x0 0x4000>;
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 0 277 IRQ_TYPE_LEVEL_HIGH>;
+		#iommu-cells = <1>;
+		power-domains = <&ps_pcie>;
+		status = "disabled";
+	};
+
+	pcie0_dart_3: iommu@604008000 {
+		compatible = "apple,t8010-dart", "apple,t8103-dart";
+		reg = <0x6 0x04008000 0x0 0x4000>;
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 0 280 IRQ_TYPE_LEVEL_HIGH>;
+		#iommu-cells = <1>;
+		power-domains = <&ps_pcie>;
+	};
+
+	pcie0: pcie@610000000 {
+		compatible = "apple,t8010-pcie", "apple,pcie";
+		device_type = "pci";
+
+		reg = <0x6 0x10000000 0x0 0x1000000>,
+		      <0x6 0x00000000 0x0 0x8000>,
+		      <0x6 0x01000000 0x0 0x4000>,
+		      <0x6 0x02000000 0x0 0x4000>,
+		      <0x6 0x03000000 0x0 0x4000>,
+		      <0x6 0x04000000 0x0 0x4000>;
+		reg-names = "config", "rc", "port0", "port1", "port2", "port3";
+
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 0 270 IRQ_TYPE_LEVEL_HIGH>,
+			     <AIC_IRQ 0 273 IRQ_TYPE_LEVEL_HIGH>,
+			     <AIC_IRQ 0 276 IRQ_TYPE_LEVEL_HIGH>,
+			     <AIC_IRQ 0 279 IRQ_TYPE_LEVEL_HIGH>;
+
+		msi-controller;
+		msi-parent = <&pcie0>;
+		msi-ranges = <&aic AIC_IRQ 0 288 IRQ_TYPE_EDGE_RISING 32>;
+
+		iommu-map = <0x100 &pcie0_dart_0 1 1>,
+			    <0x200 &pcie0_dart_1 1 1>,
+			    <0x300 &pcie0_dart_2 1 1>,
+			    <0x400 &pcie0_dart_3 1 1>;
+		iommu-map-mask = <0xff00>;
+
+		bus-range = <0 8>;
+		#address-cells = <3>;
+		#size-cells = <2>;
+
+		ranges = <0x43000000 0x6 0x10000000 0x6 0x10000000 0x0 0x40000000>,
+			 <0x02000000 0x0 0xc0000000 0x6 0x00000000 0x0 0x10000000>;
+
+		power-domains = <&ps_pcie>;
+
+		/* port 0 — NVMe (s3e / AppleEmbeddedNVMe) */
+		pci@0,0 {
+			device_type = "pci";
+			reg = <0x0 0x0 0x0 0x0 0x0>;
+			reset-gpios = <&gpio 12 GPIO_ACTIVE_LOW>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+			ranges;
+		};
+
+		/* port 3 — WLAN (BCM4355) */
+		pci@3,0 {
+			device_type = "pci";
+			reg = <0x1800 0x0 0x0 0x0 0x0>;
+			reset-gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
+			#address-cells = <3>;
+			#size-cells = <2>;
+			ranges;
+		};
+	};
+
+	nvme0: nvme@10000000 {
+		compatible = "apple,t8010-nvme-ans2", "apple,nvme-ans2";
+
+		reg = <0x0 0x10000000 0x0 0x100000>,
+		      <0x0 0x0ae00000 0x0 0x10000>;
+		reg-names = "nvme", "ans";
+
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 0 272 IRQ_TYPE_LEVEL_HIGH>;
+
+		mboxes = <&sio>;
+
+		apple,sart = <&sart>;
+
+		power-domains = <&ps_ans2>, <&ps_pcie>;
+		power-domain-names = "ans", "apcie0";
+
+		resets = <&ps_ans>;
+	};
+};

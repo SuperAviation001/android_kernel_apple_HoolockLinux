@@ -531,7 +531,6 @@
                 #power-domain-cells = <0>;
                 #reset-cells = <0>;
                 label = "ans2";
-                apple,always-on;
 	};
 
 	ps_usb2host0_ohci: power-controller@80280 {
