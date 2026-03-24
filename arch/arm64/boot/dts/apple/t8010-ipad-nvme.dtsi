@@ -28,7 +28,7 @@
 		interrupt-names = "send-empty", "send-not-empty",
 				  "recv-empty", "recv-not-empty";
 		#mbox-cells = <0>;
-		power-domains = <&ps_sio>;
+		power-domains = <&ps_pcie>;
 	};
 
 	pcie0_dart_0: iommu@601008000 {
@@ -141,9 +141,9 @@
 
 		apple,sart = <&sart>;
 
-		power-domains = <&ps_sio>, <&ps_pcie>;
-		power-domain-names = "ans", "apcie0";
+		power-domains = <&ps_pcie>;
+		power-domain-names = "apcie0";
 
-		resets = <&ps_sio>;
+		resets = <&ps_pcie>;
 	};
 };
