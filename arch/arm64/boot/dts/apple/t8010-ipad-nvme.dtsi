@@ -14,7 +14,21 @@
 	sart: iommu@601004000 {
 		compatible = "apple,t8010-sart", "apple,t8015-sart";
 		reg = <0x6 0x01004000 0x0 0x4000>;
-		power-domains = <&ps_ans2>;
+		power-domains = <&ps_pcie>;
+	};
+
+	sio_mbox: mbox@ae00000 {
+		compatible = "apple,t8010-asc-mailbox";
+		reg = <0x0 0xae00000 0x0 0x10000>;
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 0 210 IRQ_TYPE_LEVEL_HIGH>,
+			     <AIC_IRQ 0 211 IRQ_TYPE_LEVEL_HIGH>,
+			     <AIC_IRQ 0 212 IRQ_TYPE_LEVEL_HIGH>,
+			     <AIC_IRQ 0 213 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "send-empty", "send-not-empty",
+				  "recv-empty", "recv-not-empty";
+		#mbox-cells = <0>;
+		power-domains = <&ps_sio>;
 	};
 
 	pcie0_dart_0: iommu@601008000 {
@@ -96,7 +110,7 @@
 		pci@0,0 {
 			device_type = "pci";
 			reg = <0x0 0x0 0x0 0x0 0x0>;
-			reset-gpios = <&gpio 12 GPIO_ACTIVE_LOW>;
+			reset-gpios = <&pinctrl_ap 12 GPIO_ACTIVE_LOW>;
 			#address-cells = <3>;
 			#size-cells = <2>;
 			ranges;
@@ -106,7 +120,7 @@
 		pci@3,0 {
 			device_type = "pci";
 			reg = <0x1800 0x0 0x0 0x0 0x0>;
-			reset-gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
+			reset-gpios = <&pinctrl_ap 15 GPIO_ACTIVE_LOW>;
 			#address-cells = <3>;
 			#size-cells = <2>;
 			ranges;
@@ -123,13 +137,13 @@
 		interrupt-parent = <&aic>;
 		interrupts = <AIC_IRQ 0 272 IRQ_TYPE_LEVEL_HIGH>;
 
-		mboxes = <&sio>;
+		mboxes = <&sio_mbox>;
 
 		apple,sart = <&sart>;
 
-		power-domains = <&ps_ans2>, <&ps_pcie>;
+		power-domains = <&ps_sio>, <&ps_pcie>;
 		power-domain-names = "ans", "apcie0";
 
-		resets = <&ps_ans>;
+		resets = <&ps_sio>;
 	};
 };
