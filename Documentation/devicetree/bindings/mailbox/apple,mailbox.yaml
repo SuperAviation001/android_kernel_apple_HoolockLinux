@@ -39,6 +39,7 @@ properties:
           used for the NVMe coprocessor and the system management
           controller.
         items:
+          - const: apple,t8010-asc-mailbox
           - const: apple,t8015-asc-mailbox
 
       - description:
